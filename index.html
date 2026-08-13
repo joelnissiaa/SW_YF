@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Spin Wheel HUT RI</title>
+    <!-- Load Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet" />
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      body {
+        font-family: "Inter", sans-serif;
+        background-color: #000000; /* Tailwind slate-50 */
+        color: #1e293b;
+        overflow-x: hidden;
+        background-image: url('data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%23ef4444" fill-opacity="0.05"%3E%3Cpath d="M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');
+      }
+
+      /* Wheel container setup to maintain aspect ratio and responsive scaling */
+      .wheel-wrapper {
+        position: relative;
+        width: 100%;
+        max-width: 500px;
+        aspect-ratio: 1 / 1;
+        margin: 0 auto;
+      }
+
+      /* The canvas that draws the wheel, applying cubic-bezier for a realistic spin friction effect */
+      #wheel {
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        transition: transform 5s cubic-bezier(0.2, 0.8, 0.1, 1);
+        box-shadow: 0 25px 50px -12px rgba(239, 68, 68, 0.25); /* Red shadow tint */
+        background-color: #000000;
+      }
+
+      /* Confetti particle animation */
+      .confetti {
+        position: fixed;
+        top: -15px;
+        width: 10px;
+        height: 10px;
+        z-index: 100;
+        animation: fall linear forwards;
+        border-radius: 2px;
+      }
+
+      @keyframes fall {
+        to {
+          transform: translateY(100vh) rotate(720deg);
+        }
+      }
+    </style>
+  </head>
+  <body class="flex flex-col h-screen w-full overflow-hidden">
+    <!-- Main Content Area -->
+    <main class="flex-1 flex flex-col justify-start items-center p-6 gap-8 relative bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] min-h-[60vh] pt-12">
+      <!-- Center: Wheel -->
+      <div class="flex flex-col items-center w-full max-w-lg">
+        <!-- <div class="mb-8 flex flex-col items-center text-center">
+                <h1 class="text-4xl md:text-5xl font-black text-red-600 tracking-tighter mb-2 uppercase drop-shadow-sm">Semarak <br> HUT RI</h1>
+            </div> -->
+
+        <div class="wheel-wrapper">
+          <!-- The winning pointer (Top center) -->
+          <svg class="absolute z-30 w-16 h-16 drop-shadow-2xl" style="top: -32px; left: 50%; transform: translateX(-50%)" viewBox="0 0 24 24">
+            <!-- Outer white border for contrast -->
+            <path d="M12 24L2 0h20L12 24z" fill="#ffffff" />
+            <!-- Inner red pointer -->
+            <path d="M12 21L4.5 3h15L12 21z" fill="#dc2626" />
+          </svg>
+
+          <!-- The canvas where JavaScript will draw the wheel -->
+          <canvas id="wheel" width="600" height="600"></canvas>
+        </div>
+
+        <!-- Separated Spin Button -->
+        <button
+          id="spinBtn"
+          class="mt-8 w-64 h-16 bg-red-600 text-white rounded-full font-black text-2xl uppercase tracking-widest shadow-[0_10px_20px_-10px_rgba(220,38,38,0.8)] border-4 border-white hover:bg-red-700 hover:shadow-[0_15px_30px_-10px_rgba(220,38,38,1)] transition-all transform hover:-translate-y-1 active:scale-95 focus:outline-none relative overflow-hidden flex items-center justify-center group z-10"
+        >
+          <span class="relative z-10">PUTAR RODA</span>
+          <!-- Decorative inner ring -->
+          <div class="absolute inset-1 border-2 border-dashed border-red-300 rounded-full opacity-50 group-hover:animate-[spin_4s_linear_infinite]"></div>
+        </button>
+      </div>
+    </main>
+
+    <!-- Fixed Popup Modal (Positioned Higher) -->
+    <div id="resultModal" class="fixed inset-0 z-50 flex justify-center items-start pt-16 md:pt-24 bg-slate-900/60 opacity-0 pointer-events-none transition-opacity duration-300 backdrop-blur-sm">
+      <div class="bg-white rounded-3xl p-8 w-[90%] max-w-md shadow-2xl transform scale-95 transition-transform duration-300 text-center border-4 border-red-500 relative overflow-hidden" id="modalContent">
+        <!-- Decorative banner -->
+        <div class="absolute top-0 left-0 w-full h-3 bg-red-600"></div>
+
+        <h2 class="text-3xl font-black text-red-600 mb-2 mt-4 uppercase">Selamat! Merdeka!</h2>
+        <div class="py-8 px-4 bg-red-50 rounded-2xl mb-6 shadow-inner border border-red-100 min-h-[120px] flex items-center justify-center">
+          <p id="resultText" class="text-4xl font-extrabold text-slate-800 break-words leading-tight"></p>
+        </div>
+        <button id="closeModalBtn" class="w-full bg-red-600 hover:bg-red-700 text-white py-4 px-4 rounded-xl font-bold text-lg shadow-lg transition-all active:scale-95 uppercase tracking-wider">Sembunyikan</button>
+      </div>
+    </div>
+
+    <!-- Options Configuration Area (Moved to Bottom) -->
+    <section class="w-full bg-white p-6 md:p-8 flex flex-col items-center border-t border-red-200 shadow-[0_-10px_30px_-15px_rgba(0,0,0,0.1)] z-30">
+      <div class="w-full max-w-3xl flex flex-col md:flex-row gap-6">
+        <div class="flex-1 flex flex-col">
+          <label for="optionsInput" class="text-sm font-bold text-red-700 mb-2 uppercase tracking-wide flex justify-between">
+            <span>Daftar Pilihan (Satu per baris)</span>
+          </label>
+          <textarea
+            id="optionsInput"
+            class="w-full flex-1 min-h-[150px] md:min-h-[200px] bg-slate-50 text-slate-800 p-4 rounded-xl border-2 border-red-100 focus:outline-none focus:ring-4 focus:ring-red-500/20 focus:border-red-500 resize-y shadow-inner leading-relaxed transition-all font-medium"
+            placeholder="Contoh: Kipas Angin..."
+          ></textarea>
+        </div>
+
+        <div class="flex flex-col justify-end w-full md:w-48 gap-4">
+          <p class="text-slate-500 font-medium text-sm text-center md:text-left hidden md:block">Masukkan daftar hadiah atau lomba di samping.</p>
+          <button
+            id="updateBtn"
+            class="w-full bg-red-600 hover:bg-red-700 text-white py-4 px-4 rounded-xl font-bold text-lg shadow-lg shadow-red-500/40 transition-all transform hover:-translate-y-1 active:translate-y-0 border border-red-500 uppercase tracking-wider h-auto md:h-[60px]"
+          >
+            Perbarui Roda
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <script>
+      // Wheel configuration & state
+      const canvas = document.getElementById("wheel");
+      const ctx = canvas.getContext("2d");
+      const optionsInput = document.getElementById("optionsInput");
+      const updateBtn = document.getElementById("updateBtn");
+      const spinBtn = document.getElementById("spinBtn");
+      const resultModal = document.getElementById("resultModal");
+      const resultText = document.getElementById("resultText");
+      const closeModalBtn = document.getElementById("closeModalBtn");
+      const modalContent = document.getElementById("modalContent");
+
+      // Patriotic Red and White color palette
+      const colors = [
+        "#ef4444", // Red-500
+        "#ffffff", // White
+        "#dc2626", // Red-600
+        "#f8fafc", // Slate-50 (off-white for slight contrast)
+        "#b91c1c", // Red-700
+        "#f1f5f9", // Slate-100
+      ];
+
+      let segments = [];
+      let currentRotation = 0;
+      let isSpinning = false;
+      const spinDuration = 5000; // Match the CSS transition duration (5s)
+
+      // Default list of options (HUT RI Theme)
+      const defaultOptions = ["Sepeda Gunung", "Kipas Angin", "Rice Cooker", "Setrika", "Payung Cantik", "Buku Tulis", "Mug Spesial", "Uang Tunai 50rb"];
+
+      // Core drawing function to render the wheel segments and text
+      function drawWheel() {
+        // Setup base variables mapping to our canvas dimensions
+        const numSegments = segments.length;
+        const sliceAngle = (2 * Math.PI) / numSegments;
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        const radius = canvas.width / 2;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        for (let i = 0; i < numSegments; i++) {
+          const startAngle = i * sliceAngle;
+          const endAngle = startAngle + sliceAngle;
+
+          // Draw the colored slice
+          ctx.beginPath();
+          ctx.moveTo(centerX, centerY);
+          ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+          ctx.closePath();
+          ctx.fillStyle = segments[i].color;
+          ctx.fill();
+
+          // Add a red border between slices for definition
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = "#ef4444";
+          ctx.stroke();
+
+          // Draw the text
+          ctx.save();
+          ctx.translate(centerX, centerY);
+          // Rotate to center of slice
+          ctx.rotate(startAngle + sliceAngle / 2);
+
+          ctx.textAlign = "right";
+          ctx.textBaseline = "middle";
+
+          // Determine text color based on background (dark text for white bg, white text for red bg)
+          const isRedBackground = ["#ef4444", "#dc2626", "#b91c1c"].includes(segments[i].color);
+          ctx.fillStyle = isRedBackground ? "#ffffff" : "#1e293b";
+
+          ctx.font = "bold 26px Inter, sans-serif";
+
+          // Only apply shadow to text on dark/red backgrounds
+          if (isRedBackground) {
+            ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
+            ctx.shadowBlur = 4;
+            ctx.shadowOffsetX = 1;
+            ctx.shadowOffsetY = 1;
+          } else {
+            ctx.shadowColor = "transparent";
+          }
+
+          // Keep text away from the very edge and the center hub
+          ctx.fillText(segments[i].label, radius - 40, 0, radius - 120);
+          ctx.restore();
+        }
+
+        // Outer rim
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius - 2, 0, 2 * Math.PI);
+        ctx.lineWidth = 16;
+        ctx.strokeStyle = "#ef4444"; // Red outer rim
+        ctx.stroke();
+
+        // Secondary inner rim (white)
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius - 10, 0, 2 * Math.PI);
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = "#ffffff";
+        ctx.stroke();
+
+        // Inner circle / Hub (Center Axis)
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, 25, 0, 2 * Math.PI);
+        ctx.fillStyle = "#ffffff";
+        ctx.fill();
+        ctx.lineWidth = 6;
+        ctx.strokeStyle = "#ef4444";
+        ctx.stroke();
+
+        // Inner dot
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, 8, 0, 2 * Math.PI);
+        ctx.fillStyle = "#ef4444";
+        ctx.fill();
+
+        // Decorative star pegs around the rim instead of dots
+        for (let i = 0; i < numSegments; i++) {
+          const angle = i * sliceAngle;
+          const pegX = centerX + (radius - 12) * Math.cos(angle);
+          const pegY = centerY + (radius - 12) * Math.sin(angle);
+
+          ctx.save();
+          ctx.translate(pegX, pegY);
+          // Rotate stars slightly for variety
+          ctx.rotate(angle + Math.PI / 2);
+
+          // Draw a simple 5-point star
+          ctx.beginPath();
+          for (let j = 0; j < 5; j++) {
+            ctx.lineTo(Math.cos(((18 + j * 72) / 180) * Math.PI) * 8, -Math.sin(((18 + j * 72) / 180) * Math.PI) * 8);
+            ctx.lineTo(Math.cos(((54 + j * 72) / 180) * Math.PI) * 3.5, -Math.sin(((54 + j * 72) / 180) * Math.PI) * 3.5);
+          }
+          ctx.closePath();
+
+          // Alternate star colors
+          ctx.fillStyle = i % 2 === 0 ? "#ffffff" : "#fbbf24"; // White or Gold stars
+          ctx.fill();
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = "#b91c1c";
+          ctx.stroke();
+
+          ctx.restore();
+        }
+      }
+
+      // Read options from textarea and update the wheel
+      function updateSegments() {
+        // Extract non-empty lines from textarea
+        const lines = optionsInput.value
+          .split("\n")
+          .map((line) => line.trim())
+          .filter((line) => line !== "");
+
+        // We need at least 2 segments for the wheel to render logically
+        let validOptions = lines.length > 0 ? lines : ["Kosong", "Tambah Pilihan"];
+        if (validOptions.length === 1) {
+          validOptions.push("Tambah pilihan lain!");
+        }
+
+        segments = validOptions.map((label, index) => ({
+          label: label,
+          color: colors[index % colors.length],
+        }));
+
+        // Reset rotation to align cleanly on update
+        currentRotation = 0;
+        canvas.style.transition = "none";
+        canvas.style.transform = `rotate(0deg)`;
+
+        // Force reflow to apply no-transition immediately
+        void canvas.offsetWidth;
+
+        // Re-apply transition property
+        canvas.style.transition = "transform 5s cubic-bezier(0.2, 0.8, 0.1, 1)";
+
+        drawWheel();
+      }
+
+      // Calculate the winner and trigger the spin
+      function spinWheel() {
+        if (isSpinning) return;
+        isSpinning = true;
+        spinBtn.classList.add("opacity-80", "cursor-not-allowed", "scale-95");
+
+        // Generate a random rotation between 5 and 10 full spins plus a random angle offset
+        const extraSpins = 5 + Math.floor(Math.random() * 5);
+        const randomOffset = Math.floor(Math.random() * 360);
+
+        currentRotation += extraSpins * 360 + randomOffset;
+
+        // Apply rotation via CSS transform
+        canvas.style.transform = `rotate(${currentRotation}deg)`;
+
+        // Wait for animation to finish, then show result
+        setTimeout(() => {
+          isSpinning = false;
+          spinBtn.classList.remove("opacity-80", "cursor-not-allowed", "scale-95");
+          showResult();
+        }, spinDuration);
+      }
+
+      // Adjusted showResult for side-by-side layout
+      function showResult() {
+        const numSegments = segments.length;
+        const sliceAngle = 360 / numSegments;
+
+        // Calculate actual rotation offset
+        const normalizedRotation = currentRotation % 360;
+
+        // Math magic to find the segment at the top (270 degrees on a standard canvas)
+        // The top pointer represents 270 degrees on the circle.
+        // As the canvas rotates clockwise (positive), the visual wheel shifts clockwise.
+        // So the canvas point located at the top is (270 - rotation).
+        const canvasAngleAtTop = (270 - normalizedRotation + 360) % 360;
+
+        // The index of the slice occupying that angle
+        const winningIndex = Math.floor(canvasAngleAtTop / sliceAngle);
+        const winner = segments[winningIndex];
+
+        // Set winner text
+        resultText.innerText = winner.label;
+
+        // Trigger tailwind transition (remove pointer-events-none so it can be clicked)
+        setTimeout(() => {
+          resultModal.classList.remove("opacity-0", "pointer-events-none");
+          modalContent.classList.remove("scale-95");
+          modalContent.classList.add("scale-100");
+        }, 10);
+
+        fireConfetti();
+      }
+
+      // Simple DOM Confetti Generator for celebration
+      function fireConfetti() {
+        const confettiCount = 150; // More confetti
+
+        // Only use Red and White for confetti
+        const patrioticColors = ["#ef4444", "#ffffff", "#dc2626", "#f8fafc"];
+
+        for (let i = 0; i < confettiCount; i++) {
+          const conf = document.createElement("div");
+          conf.classList.add("confetti");
+          // Randomize horizontal start position
+          conf.style.left = Math.random() * 100 + "vw";
+          // Assign a random color from our patriotic palette
+          conf.style.backgroundColor = patrioticColors[Math.floor(Math.random() * patrioticColors.length)];
+
+          // Add a border to white confetti so it stands out against light backgrounds
+          if (conf.style.backgroundColor === "rgb(255, 255, 255)" || conf.style.backgroundColor === "rgb(248, 250, 252)") {
+            conf.style.border = "1px solid #ef4444";
+          }
+
+          // Randomize fall duration and delay to create a spread effect
+          conf.style.animationDuration = Math.random() * 3 + 2 + "s";
+          conf.style.animationDelay = Math.random() * 0.5 + "s";
+
+          document.body.appendChild(conf);
+
+          // Cleanup after animation completes
+          setTimeout(() => {
+            if (document.body.contains(conf)) {
+              conf.remove();
+            }
+          }, 6000);
+        }
+      }
+
+      // Bind events
+      updateBtn.addEventListener("click", updateSegments);
+      spinBtn.addEventListener("click", spinWheel);
+
+      // Hide popup result
+      closeModalBtn.addEventListener("click", () => {
+        resultModal.classList.add("opacity-0", "pointer-events-none");
+        modalContent.classList.remove("scale-100");
+        modalContent.classList.add("scale-95");
+      });
+
+      // Initialize application
+      optionsInput.value = defaultOptions.join("\n");
+      updateSegments();
+    </script>
+  </body>
+</html>
